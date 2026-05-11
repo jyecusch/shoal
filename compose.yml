@@ -1,0 +1,65 @@
+# Production-tier topology. Also serves as the local-dev peripherals stack.
+#
+# Local development:
+#   docker compose up
+# Brings up only peripheral services (Postgres now, Dragonfly/Redis later).
+# `bun run dev` starts Postgres itself, then runs the API and dashboard on the
+# host against DATABASE_URL=postgres://shoal:shoal@localhost:5432/shoal.
+#
+# Self-hosted, or prod-like:
+#   docker compose --profile full up
+# Adds the shoal container, which migrates the database on start and serves
+# the API and dashboard on http://localhost:3000.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: shoal
+      POSTGRES_PASSWORD: shoal
+      POSTGRES_DB: shoal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shoal -d shoal"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  shoal:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: apps/api/api.dockerfile
+    image: shoal:dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://shoal:shoal@postgres:5432/shoal
+      SHOAL_APP_URL: http://localhost:3000
+      SHOAL_SERVER_URL: http://localhost:3000
+      # From .env. Not `:?`, which would fail `docker compose up postgres` too.
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+
+  # Reserved for the dispatcher's distributed state when that work lands.
+  # Uncomment to enable; expose at localhost:6379 for host-side dev.
+  #
+  # dragonfly:
+  #   image: docker.dragonflydb.io/dragonflydb/dragonfly:latest
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - dragonfly-data:/data
+  #   ulimits:
+  #     memlock: -1
+
+volumes:
+  postgres-data:
+  # dragonfly-data:

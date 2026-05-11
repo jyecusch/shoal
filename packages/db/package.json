@@ -1,0 +1,25 @@
+{
+  "name": "@shoal/db",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./schema": "./schema.ts",
+    "./database": "./database.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "push": "drizzle-kit push",
+    "studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.3",
+    "@effect/sql-pg": "4.0.3",
+    "drizzle-orm": "1.0.0-rc.5-5935859",
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "drizzle-kit": "1.0.0-rc.5-5935859"
+  }
+}
