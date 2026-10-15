@@ -221,13 +221,8 @@ export function ConnectSteps({ serverWsUrl }: { serverWsUrl: string }) {
 						/>
 					</div>
 				)}
-				<WorkerCommand
-					serverWsUrl={serverWsUrl}
-					token={token}
-					backend={backend}
-					customUrl={customUrl}
-					os={os}
-					header={
+				<div className="flex flex-col gap-2">
+					<div className="self-start">
 						<Segmented
 							label="Worker operating system"
 							size="sm"
@@ -235,9 +230,25 @@ export function ConnectSteps({ serverWsUrl }: { serverWsUrl: string }) {
 							options={OS_OPTIONS}
 							onChange={setOs}
 						/>
-					}
-				/>
-				<span className="text-xs text-silt">Needs Node 22 or later on the worker machine.</span>
+					</div>
+					{/* Each OS's ways to run a worker. npx is the only one for now. */}
+					<div
+						role="tabpanel"
+						aria-label={OS_OPTIONS.find((o) => o.value === os)?.label}
+						className="flex flex-col gap-2.5 rounded-sm border border-line p-3.5"
+					>
+						<span className="text-[13px] text-mist">
+							Run it with npx. Needs Node 22 or later on the worker machine.
+						</span>
+						<WorkerCommand
+							serverWsUrl={serverWsUrl}
+							token={token}
+							backend={backend}
+							customUrl={customUrl}
+							os={os}
+						/>
+					</div>
+				</div>
 			</Step>
 		</Steps>
 	);
