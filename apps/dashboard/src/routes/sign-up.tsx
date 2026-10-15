@@ -1,10 +1,16 @@
 import { useForm } from "@tanstack/react-form";
 import { useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+	createFileRoute,
+	Link,
+	redirect,
+	useNavigate,
+} from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient } from "../lib/auth-client";
 import { TextField } from "../lib/form";
-import { serverConfigQuery } from "../lib/queries";
+import { authContextQuery, serverConfigQuery } from "../lib/queries";
+import { safeRedirect } from "../lib/safe-redirect";
 
 export const Route = createFileRoute("/sign-up")({
 	validateSearch: (
@@ -14,6 +20,12 @@ export const Route = createFileRoute("/sign-up")({
 		if (typeof search.redirect === "string") out.redirect = search.redirect;
 		if (typeof search.email === "string") out.email = search.email;
 		return out;
+	},
+	// Already signed in: carry on to where the form would have sent them.
+	beforeLoad: async ({ search, context: { queryClient } }) => {
+		if (await queryClient.ensureQueryData(authContextQuery())) {
+			throw redirect({ to: safeRedirect(search.redirect) });
+		}
 	},
 	loader: async ({ context: { queryClient } }) => ({
 		allowed: (await queryClient.ensureQueryData(serverConfigQuery())).signupAllowed,
