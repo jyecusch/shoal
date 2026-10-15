@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Check, LogOut, Monitor, Moon, Sun } from "lucide-react";
 import { authClient } from "../lib/auth-client";
@@ -29,6 +30,7 @@ const THEME_OPTIONS: Array<{
 
 export function UserMenu({ user }: { user: User }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [theme, setTheme] = useTheme();
 
   const initials = user.name
@@ -41,6 +43,7 @@ export function UserMenu({ user }: { user: User }) {
 
   async function signOut() {
     await authClient.signOut();
+    queryClient.clear();
     navigate({ to: "/sign-in" });
   }
 

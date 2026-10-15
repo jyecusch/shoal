@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form";
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient } from "../lib/auth-client";
@@ -22,6 +23,7 @@ function SignIn() {
 	const { allowed: signupAllowed } = Route.useLoaderData();
 	const { redirect } = Route.useSearch();
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const [error, setError] = useState<string | null>(null);
 
 	const form = useForm({
@@ -43,6 +45,9 @@ function SignIn() {
 				await authClient.organization.setActive({ organizationId: orgs[0].id });
 			}
 
+			// The cache still holds the signed-out auth context that sent us here;
+			// `_authed` would read it and bounce straight back.
+			queryClient.clear();
 			navigate({ to: safeRedirect(redirect) });
 		},
 	});

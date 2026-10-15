@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { authClient } from "../lib/auth-client";
@@ -112,11 +113,13 @@ function WrongAccount({
 	sessionEmail: string;
 }) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const [working, setWorking] = useState(false);
 
 	async function signOutAndRetry() {
 		setWorking(true);
 		await authClient.signOut();
+		queryClient.clear();
 		navigate({
 			to: "/sign-in",
 			search: { redirect: window.location.pathname },
@@ -157,6 +160,7 @@ function AcceptDecline({
 	info: InvitationPublicInfo;
 }) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -175,6 +179,7 @@ function AcceptDecline({
 				organizationId: data.invitation.organizationId,
 			});
 		}
+		queryClient.clear();
 		navigate({ to: "/" });
 	}
 
