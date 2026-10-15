@@ -13,7 +13,7 @@ import { authContextQuery } from "../lib/queries";
 export const Route = createFileRoute("/_authed")({
 	// Auth context flows through react-query so hover-preload of sidebar links
 	// doesn't re-fire the server call. Invalidate via
-	// `queryClient.invalidateQueries(authContextQuery().queryKey)` whenever
+	// `queryClient.clear()` (or invalidate this query) whenever
 	// server-side auth state changes (org switch, sign-in). The API
 	// re-validates the session on every request, so a stale cache here can
 	// only mislead the UI, never grant access.
