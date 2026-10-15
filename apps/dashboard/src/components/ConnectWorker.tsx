@@ -75,8 +75,8 @@ export function BackendPicker({
 	);
 }
 
-/** The worker command for a backend, as display lines and as copyable
- *  text. Without a token the command carries a placeholder. */
+/** The worker command for a backend, as display lines and as one-line
+ *  copyable text. Without a token the command carries a placeholder. */
 export function WorkerCommand({
 	serverWsUrl,
 	token,
@@ -96,12 +96,14 @@ export function WorkerCommand({
 	const needsFlag = backend !== DEFAULT_BACKEND && backendUrl !== undefined;
 	const program = "npx @shoal.school/cli worker start";
 	const tokenText = token ?? "<your API key>";
+	// Copied as one line: the `\` continuations shown below are Unix shell
+	// syntax, and Windows cmd and PowerShell would run only the first line.
 	const plain = [
-		`${program} \\`,
-		`    --server ${serverWsUrl} \\`,
-		`    --token ${tokenText}${needsFlag ? " \\" : ""}`,
-		...(needsFlag ? [`    --backend ${backendUrl}`] : []),
-	].join("\n");
+		program,
+		`--server ${serverWsUrl}`,
+		`--token ${tokenText}`,
+		...(needsFlag ? [`--backend ${backendUrl}`] : []),
+	].join(" ");
 
 	const value = (text: string) => <span className="text-[var(--signal-current)]">{text}</span>;
 	const flag = (text: string) => <span className="text-mist">{text}</span>;
