@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { CopyButton } from "./CopyButton";
+import { Segmented } from "./Segmented";
 import { CreateKeyStep, Step, Steps } from "./Steps";
 
 export interface BackendPreset {
@@ -25,6 +26,24 @@ export const BACKEND_PRESETS: ReadonlyArray<BackendPreset> = [
 ];
 
 const DEFAULT_BACKEND = "ollama";
+
+/** Where the worker will run, which decides how its command is written. */
+export type WorkerOs = "macos" | "linux" | "windows";
+
+const OS_OPTIONS: ReadonlyArray<{ value: WorkerOs; label: string }> = [
+	{ value: "macos", label: "macOS" },
+	{ value: "linux", label: "Linux" },
+	{ value: "windows", label: "Windows" },
+];
+
+/** The browser's OS, as the likeliest guess for the worker machine. */
+function detectOs(): WorkerOs {
+	const { userAgentData } = navigator as { userAgentData?: { platform: string } };
+	const platform = userAgentData?.platform ?? navigator.userAgent;
+	if (/mac|iphone|ipad/i.test(platform)) return "macos";
+	if (/win/i.test(platform)) return "windows";
+	return "linux";
+}
 
 export function BackendPicker({
 	value,
@@ -75,19 +94,22 @@ export function BackendPicker({
 	);
 }
 
-/** The worker command for a backend, as display lines and as copyable
- *  text. Without a token the command carries a placeholder. */
+/** The worker command for a backend, written for `os`'s shell. The copy
+ *  button copies exactly what is shown. Without a token the command carries
+ *  a placeholder. */
 export function WorkerCommand({
 	serverWsUrl,
 	token,
 	backend,
 	customUrl,
+	os,
 	header,
 }: {
 	serverWsUrl: string;
 	token: string | undefined;
 	backend: string;
 	customUrl: string;
+	os: WorkerOs;
 	/** Rendered in the box's top bar, beside the copy button. */
 	header?: React.ReactNode;
 }) {
@@ -96,16 +118,17 @@ export function WorkerCommand({
 	const needsFlag = backend !== DEFAULT_BACKEND && backendUrl !== undefined;
 	const program = "npx @shoal.school/cli worker start";
 	const tokenText = token ?? "<your API key>";
-	const plain = [
-		`${program} \\`,
-		`    --server ${serverWsUrl} \\`,
-		`    --token ${tokenText}${needsFlag ? " \\" : ""}`,
-		...(needsFlag ? [`    --backend ${backendUrl}`] : []),
-	].join("\n");
-
-	const value = (text: string) => <span className="text-[var(--signal-current)]">{text}</span>;
-	const flag = (text: string) => <span className="text-mist">{text}</span>;
-	const cont = <span className="text-silt"> \</span>;
+	const args = [
+		{ flag: "--server", value: serverWsUrl },
+		{ flag: "--token", value: tokenText, placeholder: !token },
+		...(needsFlag ? [{ flag: "--backend", value: backendUrl }] : []),
+	];
+	// Windows cmd and PowerShell don't understand `\` continuations, so there
+	// the command is one line, wrapped only on screen.
+	const multiline = os !== "windows";
+	const plain = [program, ...args.map((arg) => `${arg.flag} ${arg.value}`)].join(
+		multiline ? " \\\n    " : " ",
+	);
 
 	return (
 		<div className="flex flex-col rounded-sm border border-line bg-trench">
@@ -120,23 +143,28 @@ export function WorkerCommand({
 				</div>
 			)}
 			<div className="flex items-start">
-				<pre className="m-0 min-w-0 grow overflow-x-auto px-4 py-3.5 font-mono text-[12.5px] leading-[1.75] text-foam">
-					<span className="text-silt">$ </span>
+				<pre
+					className={`m-0 min-w-0 grow px-4 py-3.5 font-mono text-[12.5px] leading-[1.75] text-foam ${multiline ? "overflow-x-auto" : "break-all whitespace-pre-wrap"}`}
+				>
+					{/* Unselectable, so selecting the command by hand copies it runnable. */}
+					<span className="select-none text-silt">{multiline ? "$ " : "> "}</span>
 					{program}
-					{cont}
-					{"\n    "}
-					{flag("--server")} {value(serverWsUrl)}
-					{cont}
-					{"\n    "}
-					{flag("--token")}{" "}
-					{token ? value(token) : <span className="text-amber">{tokenText}</span>}
-					{needsFlag && (
-						<>
-							{cont}
-							{"\n    "}
-							{flag("--backend")} {value(backendUrl)}
-						</>
-					)}
+					{args.map((arg) => (
+						<Fragment key={arg.flag}>
+							{multiline ? (
+								<>
+									<span className="text-silt"> \</span>
+									{"\n    "}
+								</>
+							) : (
+								" "
+							)}
+							<span className="text-mist">{arg.flag}</span>{" "}
+							<span className={arg.placeholder ? "text-amber" : "text-[var(--signal-current)]"}>
+								{arg.value}
+							</span>
+						</Fragment>
+					))}
 				</pre>
 				{!header && (
 					<CopyButton
@@ -151,8 +179,9 @@ export function WorkerCommand({
 }
 
 /** Connect a worker in two steps: create a token (filled into the
- *  command), then pick the backend and copy the command. */
+ *  command), then pick the OS and backend and copy the command. */
 export function ConnectSteps({ serverWsUrl }: { serverWsUrl: string }) {
+	const [os, setOs] = useState(detectOs);
 	const [backend, setBackend] = useState("ollama");
 	const [customUrl, setCustomUrl] = useState("");
 	const [token, setToken] = useState<string | undefined>();
@@ -197,6 +226,16 @@ export function ConnectSteps({ serverWsUrl }: { serverWsUrl: string }) {
 					token={token}
 					backend={backend}
 					customUrl={customUrl}
+					os={os}
+					header={
+						<Segmented
+							label="Worker operating system"
+							size="sm"
+							value={os}
+							options={OS_OPTIONS}
+							onChange={setOs}
+						/>
+					}
 				/>
 				<span className="text-xs text-silt">Needs Node 22 or later on the worker machine.</span>
 			</Step>
