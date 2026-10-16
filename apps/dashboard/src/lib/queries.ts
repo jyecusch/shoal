@@ -19,7 +19,8 @@ import {
 /**
  * The signed-in user, their organizations and the active one, or null when
  * signed out. Consumed by `_authed`'s `beforeLoad`, so hover-preloads of
- * sidebar links don't each refetch. Invalidate on org switch / sign-in.
+ * sidebar links don't each refetch. `ensureQueryData` serves it even when
+ * stale, so clear the cache on sign-in and sign-out.
  */
 export const authContextQuery = () =>
 	queryOptions({

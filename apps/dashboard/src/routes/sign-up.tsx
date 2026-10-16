@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form";
+import { useQueryClient } from "@tanstack/react-query";
 import {
 	createFileRoute,
 	Link,
@@ -79,6 +80,7 @@ function SignUpForm({
 	inviteFlow: boolean;
 }) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const [error, setError] = useState<string | null>(null);
 
 	const form = useForm({
@@ -117,6 +119,7 @@ function SignUpForm({
 				await authClient.organization.setActive({ organizationId: org.id });
 			}
 
+			queryClient.clear();
 			navigate({ to: redirect?.startsWith("/") ? redirect : "/" });
 		},
 	});
