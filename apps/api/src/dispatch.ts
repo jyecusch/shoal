@@ -110,8 +110,11 @@ interface Job {
 	readonly model: string;
 	readonly startedAt: number;
 	readonly events: Queue.Queue<JobEvent, JobFailed | Cause.Done>;
-	/** Deltas received so far: a live estimate of output tokens. */
+	/** Deltas received so far, reasoning included: a live estimate of output
+	 *  tokens. */
 	outputChunks: number;
+	/** Whether the latest delta was reasoning rather than answer. */
+	thinking: boolean;
 }
 
 /** A snapshot of a job that's running, or finished with its usage still
@@ -122,6 +125,7 @@ export interface RunningJob {
 	readonly model: string;
 	readonly startedAt: number;
 	readonly outputChunks: number;
+	readonly thinking: boolean;
 	/** The job's exact output tokens once it has finished; null while running. */
 	readonly completionTokens: number | null;
 }
@@ -215,6 +219,7 @@ export class Dispatcher extends Context.Service<
 					startedAt: yield* Clock.currentTimeMillis,
 					events,
 					outputChunks: 0,
+					thinking: false,
 				});
 				yield* worker.connection.send({
 					type: "infer",
@@ -260,7 +265,11 @@ export class Dispatcher extends Context.Service<
 					const now = yield* Clock.currentTimeMillis;
 					recording.set(jobId, {
 						organizationId: job.organizationId,
-						job: { ...runningJob(jobId, job), completionTokens: done.usage.completionTokens },
+						job: {
+							...runningJob(jobId, job),
+							thinking: false,
+							completionTokens: done.usage.completionTokens,
+						},
 					});
 					yield* usage
 						.record({
@@ -293,6 +302,10 @@ export class Dispatcher extends Context.Service<
 					switch (message.type) {
 						case "delta":
 							job.outputChunks++;
+							job.thinking =
+								message.reasoning !== undefined &&
+								message.content === undefined &&
+								message.toolCalls === undefined;
 							yield* Queue.offer(job.events, message);
 							return;
 						case "embedding":
@@ -347,6 +360,7 @@ function runningJob(jobId: string, job: Job): RunningJob {
 		model: job.model,
 		startedAt: job.startedAt,
 		outputChunks: job.outputChunks,
+		thinking: job.thinking,
 		completionTokens: null,
 	};
 }

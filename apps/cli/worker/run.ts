@@ -166,6 +166,9 @@ export const runWorker = Effect.fn("runWorker")(function* (
 												...(chunk.toolCalls !== undefined
 													? { toolCalls: chunk.toolCalls }
 													: {}),
+												...(chunk.reasoning !== undefined
+													? { reasoning: chunk.reasoning }
+													: {}),
 											}),
 								),
 							);

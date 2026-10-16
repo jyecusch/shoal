@@ -396,6 +396,7 @@ function RunningRow({
 					className="live-pulse size-1.5 shrink-0 rounded-full bg-lumen"
 				/>
 				<span className="truncate text-foam">{job.model}</span>
+				{job.thinking && <span className="shrink-0 text-[11px] text-amber">thinking</span>}
 			</span>
 			<Link
 				to="/workers/$workerId"
