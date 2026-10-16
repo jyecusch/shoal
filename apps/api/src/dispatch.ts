@@ -110,8 +110,11 @@ interface Job {
 	readonly model: string;
 	readonly startedAt: number;
 	readonly events: Queue.Queue<JobEvent, JobFailed | Cause.Done>;
-	/** Deltas received so far: a live estimate of output tokens. */
+	/** Deltas received so far, reasoning included: a live estimate of output
+	 *  tokens. */
 	outputChunks: number;
+	/** Whether the latest delta was reasoning rather than answer. */
+	thinking: boolean;
 }
 
 /** A snapshot of a job that's running, or finished with its usage still
@@ -122,6 +125,7 @@ export interface RunningJob {
 	readonly model: string;
 	readonly startedAt: number;
 	readonly outputChunks: number;
+	readonly thinking: boolean;
 	/** The job's exact output tokens once it has finished; null while running. */
 	readonly completionTokens: number | null;
 }
@@ -215,6 +219,7 @@ export class Dispatcher extends Context.Service<
 					startedAt: yield* Clock.currentTimeMillis,
 					events,
 					outputChunks: 0,
+					thinking: false,
 				});
 				yield* worker.connection.send({
 					type: "infer",
@@ -260,7 +265,7 @@ export class Dispatcher extends Context.Service<
 					const now = yield* Clock.currentTimeMillis;
 					recording.set(jobId, {
 						organizationId: job.organizationId,
-						job: { ...runningJob(jobId, job), completionTokens: done.usage.completionTokens },
+						job: runningJob(jobId, job, done.usage.completionTokens),
 					});
 					yield* usage
 						.record({
@@ -293,6 +298,7 @@ export class Dispatcher extends Context.Service<
 					switch (message.type) {
 						case "delta":
 							job.outputChunks++;
+							job.thinking = isReasoningOnly(message);
 							yield* Queue.offer(job.events, message);
 							return;
 						case "embedding":
@@ -340,15 +346,25 @@ export class Dispatcher extends Context.Service<
 	);
 }
 
-function runningJob(jobId: string, job: Job): RunningJob {
+/** A snapshot of `job`. Pass `completionTokens` once it has finished; a
+ *  finished job isn't thinking. */
+function runningJob(jobId: string, job: Job, completionTokens: number | null = null): RunningJob {
 	return {
 		jobId,
 		workerId: job.workerId,
 		model: job.model,
 		startedAt: job.startedAt,
 		outputChunks: job.outputChunks,
-		completionTokens: null,
+		thinking: completionTokens === null && job.thinking,
+		completionTokens,
 	};
+}
+
+/** Whether a delta is only reasoning: the model is thinking, not answering. */
+function isReasoningOnly(delta: Extract<JobEvent, { type: "delta" }>): boolean {
+	return (
+		delta.reasoning !== undefined && delta.content === undefined && delta.toolCalls === undefined
+	);
 }
 
 /** Run a job's events to completion and reassemble its result. */
