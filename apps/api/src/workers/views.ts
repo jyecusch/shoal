@@ -46,6 +46,7 @@ const toInfo = (
 	name: row.name,
 	keyId: row.keyId,
 	...liveFields(live, now, row.lastModels),
+	paused: row.paused,
 	lastSeenAt: row.lastSeenAt.getTime(),
 	firstSeenAt: row.firstSeenAt.getTime(),
 	totalPromptTokens: usage.promptTokens,

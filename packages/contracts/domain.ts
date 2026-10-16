@@ -8,6 +8,8 @@ export const WorkerInfo = Schema.Struct({
 	/** The API key the worker last authenticated with. */
 	keyId: Schema.NullOr(Schema.String),
 	online: Schema.Boolean,
+	/** Paused from the dashboard: routed no new jobs until resumed. */
+	paused: Schema.Boolean,
 	/** Models currently resident on the worker's backends. Empty when offline. */
 	loadedModels: Schema.Array(Schema.String),
 	availableModels: Schema.Array(WorkerModel),

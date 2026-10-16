@@ -1,12 +1,15 @@
-export type WorkerStatus = "online" | "busy" | "offline";
+export type WorkerStatus = "online" | "busy" | "paused" | "offline";
 
-/** Whether a worker is connected, and if so whether it has spare capacity. */
+/** Whether a worker is connected, and if so whether it's paused or has spare
+ *  capacity. */
 export function workerStatus(worker: {
 	online: boolean;
+	paused: boolean;
 	inFlight: number;
 	maxConcurrent: number | null;
 }): WorkerStatus {
 	if (!worker.online) return "offline";
+	if (worker.paused) return "paused";
 	return worker.maxConcurrent !== null && worker.inFlight >= worker.maxConcurrent
 		? "busy"
 		: "online";
@@ -24,6 +27,7 @@ export function StatusBadge({
 	const tone = {
 		online: "border-lumen-edge bg-lumen-wash text-lumen",
 		busy: "border-amber-edge bg-amber-wash text-amber",
+		paused: "border-line-strong bg-reef text-mist",
 		offline: "border-coral-edge bg-coral-wash text-coral",
 	}[status];
 	return (
@@ -37,7 +41,7 @@ export function StatusBadge({
 }
 
 /** The bare status glyph: a pulsing live dot, an amber diamond for a worker
- *  at capacity, or a coral cross for offline. */
+ *  at capacity, pause bars for paused, or a coral cross for offline. */
 export function StatusGlyph({ status }: { status: WorkerStatus }) {
 	switch (status) {
 		case "online":
@@ -53,6 +57,12 @@ export function StatusGlyph({ status }: { status: WorkerStatus }) {
 					aria-hidden="true"
 					className="size-1.5 shrink-0 rotate-45 bg-amber"
 				/>
+			);
+		case "paused":
+			return (
+				<span aria-hidden="true" className="shrink-0 text-[11px] leading-none text-mist">
+					‖
+				</span>
 			);
 		case "offline":
 			return (

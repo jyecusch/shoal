@@ -70,6 +70,12 @@ export class WorkersGroup extends HttpApiGroup.make("workers")
 			payload: Schema.Struct({ name: Schema.NullOr(Schema.String) }),
 			success: HttpApiSchema.NoContent,
 		}),
+		HttpApiEndpoint.put("setPaused", "/:workerId/paused", {
+			params: WorkerParams,
+			payload: Schema.Struct({ paused: Schema.Boolean }),
+			success: HttpApiSchema.NoContent,
+			error: WorkerNotFound,
+		}),
 		HttpApiEndpoint.delete("remove", "/:workerId", {
 			params: WorkerParams,
 			success: HttpApiSchema.NoContent,

@@ -44,6 +44,8 @@ export interface LiveWorker {
 	readonly jobsCompleted: number;
 	/** Epoch milliseconds the current connection started. */
 	readonly connectedAt: number;
+	/** Paused from the dashboard: connected, but routed no new jobs. */
+	readonly paused: boolean;
 }
 
 type MutableWorker = { -readonly [K in keyof LiveWorker]: LiveWorker[K] };
@@ -61,6 +63,7 @@ export type WorkerChange =
 	/** Any change to a worker's live state, including connect and disconnect. */
 	| { readonly type: "live"; readonly workerId: string }
 	| { readonly type: "name"; readonly workerId: string; readonly name: string | null }
+	| { readonly type: "paused"; readonly workerId: string; readonly paused: boolean }
 	| { readonly type: "deleted"; readonly workerId: string };
 
 export interface WorkerRegistration {
@@ -71,6 +74,7 @@ export interface WorkerRegistration {
 	readonly lastSeenAt: Date;
 	/** What the worker last advertised, kept while it's offline. */
 	readonly lastModels: ReadonlyArray<WorkerModel>;
+	readonly paused: boolean;
 }
 
 export class WorkerAuthFailed extends Schema.TaggedError<WorkerAuthFailed>()(
@@ -145,6 +149,14 @@ export class WorkerRegistry extends Context.Service<
 			organizationId: string,
 			name: string | null,
 		): Effect.Effect<void, DatabaseError>;
+		/** Take a worker out of routing, or put it back. Stored, so it lasts
+		 *  across reconnects and restarts. False when the worker isn't in this
+		 *  org. */
+		setPaused(
+			workerId: string,
+			organizationId: string,
+			paused: boolean,
+		): Effect.Effect<boolean, DatabaseError>;
 		/** Disconnect and delete a worker; its usage rows cascade. False when the
 		 *  worker isn't in this org. */
 		remove(
@@ -182,6 +194,7 @@ export class WorkerRegistry extends Context.Service<
 			const bind = Effect.fnUntraced(function* (
 				workerId: string,
 				options: RegisterOptions,
+				paused: boolean,
 			) {
 				const now = yield* Clock.currentTimeMillis;
 				const worker: MutableWorker = {
@@ -195,6 +208,7 @@ export class WorkerRegistry extends Context.Service<
 					maxConcurrent: options.maxConcurrent,
 					jobsCompleted: 0,
 					connectedAt: now,
+					paused,
 				};
 				workers.set(workerId, worker);
 				yield* emitLive(worker);
@@ -218,7 +232,7 @@ export class WorkerRegistry extends Context.Service<
 						lastSeenAt: now,
 					}),
 				);
-				yield* bind(workerId, options);
+				yield* bind(workerId, options, false);
 				return { workerId, secret };
 			});
 
@@ -226,7 +240,7 @@ export class WorkerRegistry extends Context.Service<
 				function* (options: RegisterOptions & { workerId: string; secret: string }) {
 					const [row] = yield* database.query((db) =>
 						db
-							.select({ secretHash: schema.worker.secretHash })
+							.select({ secretHash: schema.worker.secretHash, paused: schema.worker.paused })
 							.from(schema.worker)
 							.where(
 								and(
@@ -259,7 +273,7 @@ export class WorkerRegistry extends Context.Service<
 							})
 							.where(eq(schema.worker.id, options.workerId)),
 					);
-					yield* bind(options.workerId, options);
+					yield* bind(options.workerId, options, row.paused);
 					if (options.name !== undefined) {
 						yield* emit(options.organizationId, {
 							type: "name",
@@ -337,7 +351,7 @@ export class WorkerRegistry extends Context.Service<
 					let cold: MutableWorker | undefined;
 					let served = false;
 					for (const w of workers.values()) {
-						if (w.organizationId !== organizationId) continue;
+						if (w.organizationId !== organizationId || w.paused) continue;
 						if (!servesTask(w, model, task)) continue;
 						served = true;
 						if (w.inFlight >= w.maxConcurrent) continue;
@@ -375,7 +389,7 @@ export class WorkerRegistry extends Context.Service<
 				Effect.sync(() => {
 					const ids = new Set<string>();
 					for (const w of workers.values()) {
-						if (w.organizationId !== organizationId) continue;
+						if (w.organizationId !== organizationId || w.paused) continue;
 						for (const m of w.availableModels) ids.add(m.id);
 					}
 					return [...ids];
@@ -412,6 +426,7 @@ export class WorkerRegistry extends Context.Service<
 							firstSeenAt: schema.worker.firstSeenAt,
 							lastSeenAt: schema.worker.lastSeenAt,
 							models: schema.worker.models,
+							paused: schema.worker.paused,
 						})
 						.from(schema.worker)
 						.where(eq(schema.worker.organizationId, organizationId))
@@ -441,6 +456,33 @@ export class WorkerRegistry extends Context.Service<
 						),
 				);
 				yield* emit(organizationId, { type: "name", workerId, name });
+			});
+
+			const setPaused = Effect.fn("WorkerRegistry.setPaused")(function* (
+				workerId: string,
+				organizationId: string,
+				paused: boolean,
+			) {
+				const updated = yield* database.query((db) =>
+					db
+						.update(schema.worker)
+						.set({ paused })
+						.where(
+							and(
+								eq(schema.worker.id, workerId),
+								eq(schema.worker.organizationId, organizationId),
+							),
+						)
+						.returning({ id: schema.worker.id }),
+				);
+				if (updated.length === 0) return false;
+				const worker = workers.get(workerId);
+				if (worker) {
+					worker.paused = paused;
+					yield* emitLive(worker);
+				}
+				yield* emit(organizationId, { type: "paused", workerId, paused });
+				return true;
 			});
 
 			const remove = Effect.fn("WorkerRegistry.remove")(function* (
@@ -496,6 +538,7 @@ export class WorkerRegistry extends Context.Service<
 				hasServed,
 				registrations,
 				rename,
+				setPaused,
 				remove,
 				subscribe,
 			});

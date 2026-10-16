@@ -206,6 +206,8 @@ export const worker = pgTable(
     /** The models the worker last advertised, kept while it's offline so a
      *  request for one can be told apart from a model nothing serves. */
     models: jsonb("models").$type<ReadonlyArray<unknown>>().default([]).notNull(),
+    /** Taken out of routing from the dashboard: gets no new jobs. */
+    paused: boolean("paused").default(false).notNull(),
   },
   (table) => [
     index("worker_organizationId_idx").on(table.organizationId),

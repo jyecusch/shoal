@@ -55,8 +55,14 @@ export const workersCollection = createCollection<WorkerInfo>({
 	onUpdate: async ({ transaction }) => {
 		const mutation = transaction.mutations[0];
 		if (!mutation) return;
-		const { workerId, name } = mutation.modified;
-		await api((c) => c.workers.rename({ params: { workerId }, payload: { name } }));
+		const { workerId, name, paused } = mutation.modified;
+		const params = { workerId };
+		if ("name" in mutation.changes) {
+			await api((c) => c.workers.rename({ params, payload: { name } }));
+		}
+		if ("paused" in mutation.changes) {
+			await api((c) => c.workers.setPaused({ params, payload: { paused } }));
+		}
 	},
 	onDelete: async ({ transaction }) => {
 		const mutation = transaction.mutations[0];

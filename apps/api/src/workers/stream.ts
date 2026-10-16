@@ -60,6 +60,9 @@ export const workerStreamRoutes = Layer.effectDiscard(
 							if (change.type === "name") {
 								return [remember({ ...previous, name: change.name })];
 							}
+							if (change.type === "paused") {
+								return [remember({ ...previous, paused: change.paused })];
+							}
 							const live = yield* registry.get(change.workerId);
 							const now = yield* Clock.currentTimeMillis;
 							return [

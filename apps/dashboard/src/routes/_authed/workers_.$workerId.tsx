@@ -198,9 +198,11 @@ function Header({
 				<StatusBadge
 					status={status}
 					label={
-						detail.online
-							? `${detail.inFlight} / ${detail.maxConcurrent} active`
-							: "offline"
+						!detail.online
+							? "offline"
+							: detail.paused
+								? "paused"
+								: `${detail.inFlight} / ${detail.maxConcurrent} active`
 					}
 				/>
 				<Button

@@ -164,6 +164,7 @@ const WorkersHandlers = HttpApiBuilder.group(
 									keyId: schema.worker.keyId,
 									keyName: schema.apikey.name,
 									models: schema.worker.models,
+									paused: schema.worker.paused,
 								})
 								.from(schema.worker)
 								.leftJoin(schema.apikey, eq(schema.worker.keyId, schema.apikey.id))
@@ -185,6 +186,7 @@ const WorkersHandlers = HttpApiBuilder.group(
 					return {
 						workerId,
 						name: row.name,
+						paused: row.paused,
 						...liveFields(live, yield* Clock.currentTimeMillis, lastModels),
 						firstSeenAt: row.firstSeenAt.getTime(),
 						lastSeenAt: row.lastSeenAt.getTime(),
@@ -202,6 +204,15 @@ const WorkersHandlers = HttpApiBuilder.group(
 					registry.rename(workerId, organizationId, payload.name),
 					).pipe(
 					Effect.orDie,
+				),
+			)
+			.handle("setPaused", ({ params: { workerId }, payload }) =>
+				inOrg((organizationId) =>
+					registry.setPaused(workerId, organizationId, payload.paused)).pipe(
+					Effect.orDie,
+					Effect.flatMap((found) =>
+						found ? Effect.void : Effect.fail(new WorkerNotFound({ workerId })),
+					),
 				),
 			)
 			.handle("remove", ({ params: { workerId } }) =>

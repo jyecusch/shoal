@@ -127,12 +127,20 @@ function WorkerCard({
 	expanded: boolean;
 	onToggle: () => void;
 }) {
-	const status = !worker.online ? "offline" : worker.inFlight > 0 ? "working" : "idle";
+	const status = !worker.online
+		? "offline"
+		: worker.paused
+			? "paused"
+			: worker.inFlight > 0
+				? "working"
+				: "idle";
 	const badge = {
 		working: "border-lumen-edge bg-lumen-wash text-lumen",
 		idle: "border-line-strong bg-reef text-mist",
+		paused: "border-line-strong bg-reef text-mist",
 		offline: "border-coral-edge bg-coral-wash text-coral",
 	}[status];
+	const glyph = { working: "●", idle: "●", paused: "‖", offline: "×" }[status];
 	const loaded = worker.availableModels.filter((m) => worker.loadedModels.includes(m.id)).length;
 	const days = series?.days ?? [];
 	const tokens = days.reduce((n, d) => n + d.promptTokens + d.completionTokens, 0);
@@ -157,7 +165,7 @@ function WorkerCard({
 						<span
 							className={`inline-flex h-5 shrink-0 items-center rounded-xs border px-1.5 font-mono text-[11px] ${badge}`}
 						>
-							{status === "offline" ? "× offline" : `● ${status}`}
+							{glyph} {status}
 						</span>
 					</span>
 					<span className="truncate text-xs text-silt">
@@ -325,6 +333,22 @@ function WorkerDetails({ worker }: { worker: WorkerInfo }) {
 						Rename
 					</Button>
 				)}
+				<Button
+					variant="secondary"
+					size="sm"
+					title={
+						worker.paused
+							? "Route new requests to this worker again"
+							: "Stop routing new requests to this worker; running jobs finish"
+					}
+					onClick={() =>
+						workersCollection.update(worker.workerId, (w) => {
+							w.paused = !worker.paused;
+						})
+					}
+				>
+					{worker.paused ? "Resume" : "Pause"}
+				</Button>
 				<DeleteWorkerDialog worker={worker} />
 			</div>
 		</div>
