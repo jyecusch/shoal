@@ -63,6 +63,13 @@ export type WorkerChange =
 	| { readonly type: "name"; readonly workerId: string; readonly name: string | null }
 	| { readonly type: "deleted"; readonly workerId: string };
 
+/** A model in the org's list, and whether a connected worker serves it now:
+ *  unavailable means its workers are offline, not that they're busy. */
+export interface ListedModel {
+	readonly id: string;
+	readonly available: boolean;
+}
+
 export interface WorkerRegistration {
 	readonly workerId: string;
 	readonly name: string | null;
@@ -127,9 +134,11 @@ export class WorkerRegistry extends Context.Service<
 		release(workerId: string, outcome: "completed" | "abandoned"): Effect.Effect<void>;
 		get(workerId: string): Effect.Effect<Option.Option<LiveWorker>>;
 		live(organizationId: string): Effect.Effect<ReadonlyArray<LiveWorker>>;
-		/** Distinct model ids the org's workers serve, or last advertised before
-		 *  going offline. */
-		availableModels(organizationId: string): Effect.Effect<ReadonlyArray<string>, DatabaseError>;
+		/** Every model the org's workers serve or last advertised before going
+		 *  offline, and whether a connected worker serves it now. */
+		listModels(
+			organizationId: string,
+		): Effect.Effect<ReadonlyArray<ListedModel>, DatabaseError>;
 		/** Whether any worker in the org, connected or not, last advertised the
 		 *  model for this task. */
 		hasServed(
@@ -372,7 +381,7 @@ export class WorkerRegistry extends Context.Service<
 					[...workers.values()].filter((w) => w.organizationId === organizationId),
 				);
 
-			const availableModels = Effect.fn("WorkerRegistry.availableModels")(function* (
+			const listModels = Effect.fn("WorkerRegistry.listModels")(function* (
 				organizationId: string,
 			) {
 				const rows = yield* database.query((db) =>
@@ -385,11 +394,13 @@ export class WorkerRegistry extends Context.Service<
 				for (const row of rows) {
 					for (const m of yield* storedModels(row.workerId, row.models)) ids.add(m.id);
 				}
+				const online = new Set<string>();
 				for (const w of workers.values()) {
 					if (w.organizationId !== organizationId) continue;
-					for (const m of w.availableModels) ids.add(m.id);
+					for (const m of w.availableModels) online.add(m.id);
 				}
-				return [...ids];
+				for (const id of online) ids.add(id);
+				return [...ids].map((id): ListedModel => ({ id, available: online.has(id) }));
 			});
 
 			const hasServed = Effect.fn("WorkerRegistry.hasServed")(function* (
@@ -503,7 +514,7 @@ export class WorkerRegistry extends Context.Service<
 						return Option.fromNullishOr(worker);
 					}),
 				live,
-				availableModels,
+				listModels,
 				hasServed,
 				registrations,
 				rename,
