@@ -96,6 +96,8 @@ const chatChunks = (
 		Stream.flatMap((event): Stream.Stream<string> => {
 			if (event.type === "delta") {
 				const delta = definedOnly({
+					// The de facto field for reasoning in OpenAI-style APIs.
+					reasoning_content: event.reasoning || undefined,
 					content: event.content || undefined,
 					tool_calls: event.toolCalls?.length
 						? event.toolCalls.map((tc) => ({
@@ -248,6 +250,7 @@ export const openAIRoutes = Layer.effectDiscard(
 							message: {
 								role: "assistant",
 								content: result.content || null,
+								...(result.reasoning ? { reasoning_content: result.reasoning } : {}),
 								...(result.toolCalls.length > 0
 									? {
 											tool_calls: result.toolCalls.map((tc) => ({

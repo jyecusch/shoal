@@ -115,8 +115,8 @@ export const WorkerMessage = Schema.Union([
 	// Streaming chunk. `content` carries text fragments; `toolCalls` carries
 	// function-call fragments where `arguments` is a JSON string slice that must
 	// be concatenated by index across successive deltas. `reasoning` carries a
-	// thinking model's reasoning fragments, which aren't part of the answer; the
-	// API counts them for live activity but doesn't send them to clients.
+	// thinking model's reasoning fragments, which aren't part of the answer. The
+	// OpenAI dialect sends them to clients as `reasoning_content`.
 	Schema.Struct({
 		type: Schema.tag("delta"),
 		jobId: Schema.String,

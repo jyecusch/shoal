@@ -57,6 +57,8 @@ export interface ToolCall {
 /** A finished job, reassembled from its events. */
 export interface JobResult {
 	readonly content: string;
+	/** A thinking model's reasoning, if it streamed any. Not part of `content`. */
+	readonly reasoning?: string;
 	readonly toolCalls: ReadonlyArray<ToolCall>;
 	readonly finishReason: FinishReason;
 	readonly embedding?: ReadonlyArray<number>;
@@ -449,6 +451,7 @@ export const resultOf = <E>(events: Stream.Stream<JobEvent, E>) =>
 
 interface Accumulated {
 	readonly content: string;
+	readonly reasoning: string;
 	readonly toolCalls: ReadonlyMap<number, ToolCall>;
 	readonly done?: Extract<JobEvent, { type: "done" }>;
 	readonly embedding?: ReadonlyArray<number>;
@@ -456,7 +459,7 @@ interface Accumulated {
 	readonly audio?: { readonly b64: string; readonly mimeType: string };
 }
 
-const emptyResult: Accumulated = { content: "", toolCalls: new Map() };
+const emptyResult: Accumulated = { content: "", reasoning: "", toolCalls: new Map() };
 
 /** Fold one event into the result so far. Tool-call `arguments` arrive as
  *  JSON slices to concatenate per call index; `id` and `name` arrive once. */
@@ -473,7 +476,12 @@ function applyEvent(acc: Accumulated, event: JobEvent): Accumulated {
 					arguments: (prev?.arguments ?? "") + (tc.arguments ?? ""),
 				});
 			}
-			return { ...acc, content: acc.content + (event.content ?? ""), toolCalls };
+			return {
+				...acc,
+				content: acc.content + (event.content ?? ""),
+				reasoning: acc.reasoning + (event.reasoning ?? ""),
+				toolCalls,
+			};
 		}
 		case "embedding":
 			return { ...acc, embedding: event.vector };
@@ -489,6 +497,7 @@ function applyEvent(acc: Accumulated, event: JobEvent): Accumulated {
 function finish(acc: Accumulated): JobResult {
 	return {
 		content: acc.content,
+		...(acc.reasoning ? { reasoning: acc.reasoning } : {}),
 		toolCalls: [...acc.toolCalls.values()].sort((a, b) => a.index - b.index),
 		finishReason: acc.done?.finishReason ?? "stop",
 		...(acc.embedding !== undefined ? { embedding: acc.embedding } : {}),
