@@ -384,14 +384,17 @@ export const openAIRoutes = Layer.effectDiscard(
 			"/models",
 			Effect.fnUntraced(function* (request) {
 				const { organizationId } = yield* authenticate(request);
-				const ids = yield* registry.availableModels(organizationId);
+				const models = yield* registry.listModels(organizationId);
 				return HttpServerResponse.jsonUnsafe({
 					object: "list",
-					data: ids.map((id) => ({
+					// `available` isn't in OpenAI's schema; clients that don't know it
+					// ignore it. False means the model's workers are offline.
+					data: models.map(({ id, available }) => ({
 						id,
 						object: "model",
 						created: 0,
 						owned_by: "worker",
+						available,
 					})),
 				});
 			}),
