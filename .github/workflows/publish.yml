@@ -21,6 +21,8 @@ jobs:
           bunx tsc --noEmit -p apps/web
       - name: Test
         run: bun test --pass-with-no-tests
+      - name: Test dashboard
+        run: bun run --filter @shoal/dashboard test
 
   release-cli:
     needs: checks

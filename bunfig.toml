@@ -1,0 +1,4 @@
+[test]
+# The dashboard's tests are written for Vitest (jsdom, vi.stubGlobal), which
+# Bun's runner doesn't support; CI runs them with `bun run --filter @shoal/dashboard test`.
+pathIgnorePatterns = ["apps/dashboard/**"]
