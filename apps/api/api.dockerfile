@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.20
 #
 # Production server image: the API, serving the built dashboard. Expects
 # DATABASE_URL to point at Postgres. On start it applies pending migrations,
@@ -8,13 +8,7 @@
 FROM oven/bun:1 AS build
 WORKDIR /app
 COPY bun.lock package.json ./
-COPY apps/api/package.json apps/api/
-COPY apps/cli/package.json apps/cli/
-COPY apps/dashboard/package.json apps/dashboard/
-COPY apps/web/package.json apps/web/
-COPY packages/contracts/package.json packages/contracts/
-COPY packages/db/package.json packages/db/
-COPY packages/protocol/package.json packages/protocol/
+COPY --parents apps/*/package.json packages/*/package.json ./
 RUN bun install --frozen-lockfile --filter '@shoal/api' --filter '@shoal/dashboard'
 COPY . .
 RUN cd apps/dashboard && bun run build
